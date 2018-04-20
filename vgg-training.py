@@ -202,8 +202,10 @@ print('Model loaded.')
 # build a classifier model to put on top of the convolutional model
 top_model = Sequential()
 top_model.add(Flatten(input_shape=base_model.output_shape[1:]))
-top_model.add(Dense(256, activation='relu'))
-top_model.add(Dropout(0.5))
+top_model.add(Dense(4096, activation='relu'))
+top_model.add(Dropout(0.1))
+top_model.add(Dense(4096, activation='relu'))
+top_model.add(Dropout(0.1))
 top_model.add(Dense(1, activation='sigmoid'))
 
 # note that it is necessary to start with a fully-trained
