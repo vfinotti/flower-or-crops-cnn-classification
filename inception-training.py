@@ -3,52 +3,9 @@
 
 # Using the tutorial from https://blog.keras.io/building-powerful-image-classification-models-using-very-little-data.html
 
-# In[1]:
 
+# import warnings; warnings.simplefilter('ignore')
 
-import warnings; warnings.simplefilter('ignore')
-
-
-# In[2]:
-
-
-'''This script goes along the blog post
-"Building powerful image classification models using very little data"
-from blog.keras.io.
-It uses data that can be downloaded at:
-https://www.kaggle.com/c/dogs-vs-cats/data
-In our setup, we:
-- created a data/ folder
-- created train/ and validation/ subfolders inside data/
-- created cats/ and dogs/ subfolders inside train/ and validation/
-- put the cat pictures index 0-999 in data/train/cats
-- put the cat pictures index 1000-1400 in data/validation/cats
-- put the dogs pictures index 12500-13499 in data/train/dogs
-- put the dog pictures index 13500-13900 in data/validation/dogs
-So that we have 1000 training examples for each class, and 400 validation examples for each class.
-In summary, this is our directory structure:
-```
-data/
-    train/
-        dogs/
-            dog001.jpg
-            dog002.jpg
-            ...
-        cats/
-            cat001.jpg
-            cat002.jpg
-            ...
-    validation/
-        dogs/
-            dog001.jpg
-            dog002.jpg
-            ...
-        cats/
-            cat001.jpg
-            cat002.jpg
-            ...
-```
-'''
 import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
@@ -58,15 +15,15 @@ from keras import applications
 np.random.seed(42)
 
 # dimensions of our images.
-img_width, img_height = 150, 150
+img_width, img_height = 299, 299
 
-top_model_weights_path = 'bottleneck_fc_model_inceptionv3.h5'
+top_model_weights_path = 'weights/bottleneck_fc_model_inceptionv3.h5'
 train_data_dir = 'images/train'
 validation_data_dir = 'images/test'
-nb_train_samples = 7000
-nb_validation_samples = 1000
-epochs = 50
-batch_size = 10
+nb_train_samples = 16000
+nb_validation_samples = 2000
+epochs = 15
+batch_size = 20
 
 def does_file_exist(fname):
     import os.path
@@ -86,8 +43,7 @@ def save_bottlebeck_features():
         shuffle=False)
     bottleneck_features_train = model.predict_generator(
         generator, nb_train_samples // batch_size)
-    print('NUHHHH')
-    np.save('bottleneck_features_train_inceptionv3.npy', bottleneck_features_train)
+    np.save('weights/bottleneck_features_train_inceptionv3.npy', bottleneck_features_train)
 
     generator = datagen.flow_from_directory(
         validation_data_dir,
@@ -97,21 +53,23 @@ def save_bottlebeck_features():
         shuffle=False)
     bottleneck_features_validation = model.predict_generator(
         generator, nb_validation_samples // batch_size)
-    np.save('bottleneck_features_validation_inceptionv3.npy', bottleneck_features_validation)
+    np.save('weights/bottleneck_features_validation_inceptionv3.npy', bottleneck_features_validation)
 
 def train_top_model():
-    train_data = np.load('bottleneck_features_train_inceptionv3.npy')
+    train_data = np.load('weights/bottleneck_features_train_inceptionv3.npy')
     train_labels = np.array(
         [0] * (nb_train_samples // 2) + [1] * (nb_train_samples // 2))
 
-    validation_data = np.load('bottleneck_features_validation_inceptionv3.npy')
+    validation_data = np.load('weights/bottleneck_features_validation_inceptionv3.npy')
     validation_labels = np.array(
         [0] * (nb_validation_samples // 2) + [1] * (nb_validation_samples // 2))
 
     model = Sequential()
     model.add(Flatten(input_shape=train_data.shape[1:]))
-    model.add(Dense(256, activation='relu'))
-    model.add(Dropout(0.5))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dropout(0.2))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dropout(0.2))
     model.add(Dense(1, activation='sigmoid'))
 
     model.compile(optimizer='rmsprop',
@@ -123,12 +81,15 @@ def train_top_model():
               validation_data=(validation_data, validation_labels))
     model.save_weights(top_model_weights_path)
 
-
-if (not does_file_exist('bottleneck_features_train_inceptionv3.npy')):
+if (not does_file_exist('weights/bottleneck_features_train_inceptionv3.npy') or not does_file_exist('weights/bottleneck_features_train_inceptionv3.npy')):
     save_bottlebeck_features()
+else:
+    print('Bottleneck npy files exist, not saving it!')
+
+if (not does_file_exist(top_model_weights_path)):
     train_top_model()
 else:
-    print('Bottleneck h5 file exists, not training it!')
+    print('Full Connected h5 file exists, not training it!')
 
 
 # In[5]:
@@ -184,18 +145,18 @@ np.random.seed(42)
 
 # path to the model weights files.
 weights_path = '../keras/examples/inceptionv3_weights.h5'
-top_model_weights_path = 'bottleneck_fc_model_inceptionv3.h5'
+top_model_weights_path = 'weights/bottleneck_fc_model_inceptionv3.h5'
 # dimensions of our images.
-img_width, img_height = 150, 150
+img_width, img_height = 299, 299
 
 train_data_dir = 'images/train'
 validation_data_dir = 'images/test'
-nb_train_samples = 7000
-nb_validation_samples = 1000
-epochs = 50
+nb_train_samples = 16000
+nb_validation_samples = 2000
+epochs = 5
 batch_size = 72*2 # number of cores of Phi02 *2, according to Intel's suggestion 
 
-# build the VGG16 network
+# build the InceptionV3 network
 base_model = applications.InceptionV3(weights='imagenet', include_top=False,
                                 input_shape = (img_width, img_height, 3))
 print('Model loaded.')
@@ -203,8 +164,10 @@ print('Model loaded.')
 # build a classifier model to put on top of the convolutional model
 top_model = Sequential()
 top_model.add(Flatten(input_shape=base_model.output_shape[1:]))
-top_model.add(Dense(256, activation='relu'))
-top_model.add(Dropout(0.5))
+top_model.add(Dense(64, activation='relu'))
+top_model.add(Dropout(0.2))
+top_model.add(Dense(64, activation='relu'))
+top_model.add(Dropout(0.2))
 top_model.add(Dense(1, activation='sigmoid'))
 
 # note that it is necessary to start with a fully-trained
